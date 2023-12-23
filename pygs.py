@@ -1,4 +1,5 @@
 import ast
+import argparse
 
 class PyGameInterpreter(ast.NodeVisitor):
     def __init__(self):
@@ -35,14 +36,23 @@ class PyGameInterpreter(ast.NodeVisitor):
     def visit_Print(self, node):
         values = [self.visit(value) for value in node.values]
         print(*values)
+        return None
 
 def run_pygamescript(code):
     tree = ast.parse(code)
     interpreter = PyGameInterpreter()
     interpreter.visit(tree)
 
-if __name__ == "__main__":
-    with open("your_script.pygs", "r") as file:
+def main():
+    parser = argparse.ArgumentParser(description='PyGameScript Interpreter')
+    parser.add_argument('script_file', type=str, help='Path to the PyGameScript file to run')
+
+    args = parser.parse_args()
+
+    with open(args.script_file, "r") as file:
         script_code = file.read()
 
     run_pygamescript(script_code)
+
+if __name__ == "__main__":
+    main()
