@@ -1,68 +1,45 @@
-from lark import Lark, Transformer, v_args
+import ast
 
-# Define the PyGameScript grammar
-grammar = """
-    start: stmt+
-
-    ?stmt: assign_stmt
-         | print_stmt
-
-    assign_stmt: NAME "=" expr
-
-    ?expr: atom
-         | expr "+" expr -> add
-
-    ?atom: NUMBER -> number
-         | NAME -> variable
-
-    print_stmt: "print" "(" expr ("," expr)* ")"
-
-    %import common.CNAME -> NAME
-    %import common.NUMBER
-    %import common.WS
-
-    %ignore WS
-"""
-
-# Transformer to convert the parse tree to a format suitable for interpretation
-@v_args(inline=True)
-class PyGameTransformer(Transformer):
-    def add(self, left, right):
-        return left + right
-
-    def number(self, value):
-        return float(value)
-
-    def variable(self, name):
-        return name
-
-def run_pygamescript(code):
-    parser = Lark(grammar, parser='lalr', transformer=PyGameTransformer())
-    tree = parser.parse(code)
-    interpreter = PyGameInterpreter()
-    interpreter.visit(tree)
-
-class PyGameInterpreter:
+class PyGameInterpreter(ast.NodeVisitor):
     def __init__(self):
         self.scope = {}
 
-    def visit_assign_stmt(self, tree):
-        name, value = tree.children
+    def visit_Module(self, node):
+        for statement in node.body:
+            self.visit(statement)
+
+    def visit_Assign(self, node):
+        name = node.targets[0].id
+        value = self.visit(node.value)
         self.scope[name] = value
 
-    def visit_print_stmt(self, tree):
-        values = [self.visit(child) for child in tree.children]
+    def visit_BinOp(self, node):
+        left = self.visit(node.left)
+        right = self.visit(node.right)
+
+        if isinstance(node.op, ast.Add):
+            return left + right
+        elif isinstance(node.op, ast.Sub):
+            return left - right
+        elif isinstance(node.op, ast.Mult):
+            return left * right
+        elif isinstance(node.op, ast.Div):
+            return left / right
+
+    def visit_Num(self, node):
+        return node.n
+
+    def visit_Name(self, node):
+        return self.scope.get(node.id, None)
+
+    def visit_Print(self, node):
+        values = [self.visit(value) for value in node.values]
         print(*values)
 
-    def visit_add(self, tree):
-        left, right = tree.children
-        return left + right
-
-    def visit_number(self, tree):
-        return float(tree.children[0])
-
-    def visit_variable(self, tree):
-        return self.scope.get(tree.children[0], None)
+def run_pygamescript(code):
+    tree = ast.parse(code)
+    interpreter = PyGameInterpreter()
+    interpreter.visit(tree)
 
 if __name__ == "__main__":
     with open("your_script.pygs", "r") as file:
