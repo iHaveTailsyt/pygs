@@ -1,43 +1,18 @@
 import os
 import json
 import sys
+import shutil
+import requests
+from zipfile import ZipFile
 
-PYG_PACKAGES_DIR = 'pyg_packages'
+PYG_PACKAGES_DIR = 'pyg_modules'
+GITHUB_API_URL = 'https://api.github.com/repos'
 
-class PyGameInterpreter:
-    def __init__(self):
-        self.scope = {}
-
-    def visit(self, node):
-        if node['type'] == 'Program':
-            for statement in node['body']:
-                self.visit(statement)
-        elif node['type'] == 'VariableDeclaration':
-            for declaration in node['declarations']:
-                self.scope[declaration['id']['name']] = self.visit(declaration['init'])
-        elif node['type'] == 'Literal':
-            return node['value']
-        elif node['type'] == 'Identifier':
-            return self.scope.get(node['name'], None)
-        elif node['type'] == 'BinaryExpression':
-            left = self.visit(node['left'])
-            right = self.visit(node['right'])
-            if node['operator'] == '+':
-                return left + right
-            elif node['operator'] == '-':
-                return left - right
-            elif node['operator'] == '*':
-                return left * right
-            elif node['operator'] == '/':
-                return left / right
-        else:
-            print(f"Unsupported node type: {node['type']}")
-            sys.exit(1)
-
-    def run_pygame_script(self, code):
-        ast = json.loads(code)
-        for statement in ast['body']:
-            self.visit(statement)
+class PyGamePackage:
+    def __init__(self, name, version, main):
+        self.name = name
+        self.version = version
+        self.main = main
 
 def read_package_json(package_name):
     package_dir = os.path.join(PYG_PACKAGES_DIR, package_name)
@@ -61,6 +36,44 @@ def install_package(package_name, global_install=False):
 
     print(f'Package {package_name} successfully installed.')
 
+def run_pygame_script(filename):
+    with open(filename, 'r') as file:
+        code = file.read()
+    # Implement your PyGameScript interpreter logic here
+    print(f'Running PyGameScript: {filename}')
+
+def download_and_extract_zip(url, destination):
+    response = requests.get(url)
+    if response.status_code == 200:
+        with ZipFile(io.BytesIO(response.content)) as zip_file:
+            zip_file.extractall(destination)
+    else:
+        print(f'Error downloading and extracting ZIP file from {url}')
+        sys.exit(1)
+
+def install_community_package(package_name):
+    package_metadata_url = f'{GITHUB_API_URL}/{package_name}/contents/pyg.json'
+    response = requests.get(package_metadata_url)
+    if response.status_code == 200:
+        package_metadata = json.loads(response.text)
+        print(f'Installing community package: {package_name}@{package_metadata["version"]}')
+
+        # Download and extract the package
+        package_zip_url = f'{GITHUB_API_URL}/{package_name}/zipball/{package_metadata["version"]}'
+        package_dir = os.path.join(PYG_PACKAGES_DIR, f'{package_name}@{package_metadata["version"]}')
+        os.makedirs(package_dir, exist_ok=True)
+
+        download_and_extract_zip(package_zip_url, package_dir)
+
+        # Move pyg.json to the root of the package directory
+        package_json_path = os.path.join(package_dir, f'{package_name}@{package_metadata["version"]}', 'pyg.json')
+        shutil.move(package_json_path, os.path.join(package_dir, 'pyg.json'))
+
+        print(f'Community package {package_name} successfully installed.')
+    else:
+        print(f'Error fetching metadata for package "{package_name}"')
+        sys.exit(1)
+
 def main():
     if len(sys.argv) < 2:
         print('Usage: python pyg.py <command> [arguments]')
@@ -79,10 +92,13 @@ def main():
             print('Usage: python pyg.py run script.pygs')
             sys.exit(1)
         script_filename = sys.argv[2]
-        with open(script_filename, 'r') as file:
-            code = file.read()
-        interpreter = PyGameInterpreter()
-        interpreter.run_pygame_script(code)
+        run_pygame_script(script_filename)
+    elif command == 'install-community':
+        if len(sys.argv) < 3:
+            print('Usage: python pyg.py install-community package_name')
+            sys.exit(1)
+        package_name = sys.argv[2]
+        install_community_package(package_name)
     else:
         print(f'Error: Unknown command "{command}"')
         sys.exit(1)
