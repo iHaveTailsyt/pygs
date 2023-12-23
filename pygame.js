@@ -33,6 +33,18 @@ class PyGameInterpreter {
         default:
           throw new Error(`Unsupported operator: ${node.operator}`);
       }
+    } else if (node.type === 'ExpressionStatement') {
+      this.visit(node.expression);
+    } else if (node.type === 'AssignmentExpression') {
+      const variableName = node.left.name;
+      const value = this.visit(node.right);
+      this.scope[variableName] = value;
+    } else if (node.type === 'CallExpression' && node.callee.name === 'print') {
+      node.arguments.forEach(arg => {
+        const value = this.visit(arg);
+        process.stdout.write(value + ' ');
+      });
+      process.stdout.write('\n');
     } else {
       throw new Error(`Unsupported node type: ${node.type}`);
     }
