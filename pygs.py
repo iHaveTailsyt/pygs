@@ -5,16 +5,12 @@ grammar = """
     start: stmt+
 
     ?stmt: assign_stmt
-         | expr_stmt
          | print_stmt
 
     assign_stmt: NAME "=" expr
 
     ?expr: atom
          | expr "+" expr -> add
-         | expr "-" expr -> subtract
-         | expr "*" expr -> multiply
-         | expr "/" expr -> divide
 
     ?atom: NUMBER -> number
          | NAME -> variable
@@ -33,15 +29,6 @@ grammar = """
 class PyGameTransformer(Transformer):
     def add(self, left, right):
         return left + right
-
-    def subtract(self, left, right):
-        return left - right
-
-    def multiply(self, left, right):
-        return left * right
-
-    def divide(self, left, right):
-        return left / right
 
     def number(self, value):
         return float(value)
@@ -63,9 +50,6 @@ class PyGameInterpreter:
         name, value = tree.children
         self.scope[name] = value
 
-    def visit_expr_stmt(self, tree):
-        return self.visit(tree.children[0])
-
     def visit_print_stmt(self, tree):
         values = [self.visit(child) for child in tree.children]
         print(*values)
@@ -73,18 +57,6 @@ class PyGameInterpreter:
     def visit_add(self, tree):
         left, right = tree.children
         return left + right
-
-    def visit_subtract(self, tree):
-        left, right = tree.children
-        return left - right
-
-    def visit_multiply(self, tree):
-        left, right = tree.children
-        return left * right
-
-    def visit_divide(self, tree):
-        left, right = tree.children
-        return left / right
 
     def visit_number(self, tree):
         return float(tree.children[0])
